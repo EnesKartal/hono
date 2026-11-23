@@ -329,6 +329,87 @@ describe('Cookie Middleware', () => {
       )
     })
 
+    app.get('/set-http-prefix-cookie', (c) => {
+      setCookie(c, 'delicious_cookie', 'macha', {
+        prefix: 'http',
+        domain: 'example.com',
+        path: '/app',
+        secure: false, // this will be ignored
+        httpOnly: false, // this will be ignored
+      })
+      return c.text('Set http prefix cookie')
+    })
+
+    app.get('/get-http-prefix-cookie', (c) => {
+      const cookie = getCookie(c, 'delicious_cookie', 'http')
+      return c.text(cookie ?? '')
+    })
+
+    app.get('/set-host-http-prefix-cookie', (c) => {
+      setCookie(c, 'delicious_cookie', 'macha', {
+        prefix: 'host-http',
+        path: '/foo', // this will be ignored
+        domain: 'example.com', // this will be ignored
+        secure: false, // this will be ignored
+        httpOnly: false, // this will be ignored
+      })
+      return c.text('Set host-http prefix cookie')
+    })
+
+    app.get('/get-host-http-prefix-cookie', (c) => {
+      const cookie = getCookie(c, 'delicious_cookie', 'host-http')
+      return c.text(cookie ?? '')
+    })
+
+    app.get('/set-signed-http-prefix-cookie', async (c) => {
+      await setSignedCookie(c, 'delicious_cookie', 'macha', 'secret choco chips', {
+        prefix: 'http',
+      })
+      return c.text('Set signed http prefix cookie')
+    })
+
+    app.get('/set-signed-host-http-prefix-cookie', async (c) => {
+      await setSignedCookie(c, 'delicious_cookie', 'macha', 'secret choco chips', {
+        prefix: 'host-http',
+        domain: 'example.com', // this will be ignored
+        path: '/foo', // this will be ignored
+      })
+      return c.text('Set signed host-http prefix cookie')
+    })
+
+    it('Set and get cookie with http prefix', async () => {
+      const res = await app.request('http://localhost/set-http-prefix-cookie')
+      expect(res.status).toBe(200)
+      const header = res.headers.get('Set-Cookie')
+      expect(header).toBe('__Http-delicious_cookie=macha; Domain=example.com; Path=/app; HttpOnly; Secure')
+      const getRes = await app.request('http://localhost/get-http-prefix-cookie', {
+        headers: { Cookie: header! },
+      })
+      expect(await getRes.text()).toBe('macha')
+    })
+
+    it('Set and get cookie with host-http prefix', async () => {
+      const res = await app.request('http://localhost/set-host-http-prefix-cookie')
+      expect(res.status).toBe(200)
+      const header = res.headers.get('Set-Cookie')
+      expect(header).toBe('__Host-Http-delicious_cookie=macha; Path=/; HttpOnly; Secure')
+      const getRes = await app.request('http://localhost/get-host-http-prefix-cookie', {
+        headers: { Cookie: header! },
+      })
+      expect(await getRes.text()).toBe('macha')
+    })
+
+    it('Set signed cookie with http and host-http prefixes', async () => {
+      const httpRes = await app.request('http://localhost/set-signed-http-prefix-cookie')
+      expect(httpRes.headers.get('Set-Cookie')).toBe(
+        '__Http-delicious_cookie=macha.i225faTyCrJUY8TvpTuJHI20HBWbQ89B4GV7lT4E%2FB0%3D; Path=/; HttpOnly; Secure'
+      )
+      const hostHttpRes = await app.request('http://localhost/set-signed-host-http-prefix-cookie')
+      expect(hostHttpRes.headers.get('Set-Cookie')).toBe(
+        '__Host-Http-delicious_cookie=macha.i225faTyCrJUY8TvpTuJHI20HBWbQ89B4GV7lT4E%2FB0%3D; Path=/; HttpOnly; Secure'
+      )
+    })
+
     app.get('/set-cookie-complex', (c) => {
       setCookie(c, 'great_cookie', 'banana', {
         path: '/',

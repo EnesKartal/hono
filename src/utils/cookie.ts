@@ -13,6 +13,8 @@ type PartitionedCookieConstraint =
   | { partitioned?: boolean; secure?: boolean } // reset to default
 type SecureCookieConstraint = { secure: true }
 type HostCookieConstraint = { secure: true; path: '/'; domain?: undefined }
+type HttpCookieConstraint = { secure: true; httpOnly: true }
+type HostHttpCookieConstraint = { secure: true; httpOnly: true; path: '/'; domain?: undefined }
 
 export type CookieOptions = {
   domain?: string
@@ -26,14 +28,18 @@ export type CookieOptions = {
   priority?: 'Low' | 'Medium' | 'High' | 'low' | 'medium' | 'high'
   prefix?: CookiePrefixOptions
 } & PartitionedCookieConstraint
-export type CookiePrefixOptions = 'host' | 'secure'
+export type CookiePrefixOptions = 'host' | 'secure' | 'http' | 'host-http'
 
 export type CookieConstraint<Name> =
   Lowercase<Name & string> extends `__secure-${string}`
     ? CookieOptions & SecureCookieConstraint
-    : Lowercase<Name & string> extends `__host-${string}`
-      ? CookieOptions & HostCookieConstraint
-      : CookieOptions
+    : Lowercase<Name & string> extends `__host-http-${string}`
+      ? CookieOptions & HostHttpCookieConstraint
+      : Lowercase<Name & string> extends `__host-${string}`
+        ? CookieOptions & HostCookieConstraint
+        : Lowercase<Name & string> extends `__http-${string}`
+          ? CookieOptions & HttpCookieConstraint
+          : CookieOptions
 
 const algorithm = { name: 'HMAC', hash: 'SHA-256' }
 
@@ -183,6 +189,16 @@ const _serialize = (name: string, value: string, opt: CookieOptions = {}): strin
     throw new Error('__Secure- Cookie must have Secure attributes')
   }
 
+  if (/^__http-/i.test(name)) {
+    if (!opt.secure) {
+      throw new Error('__Http- Cookie must have Secure attributes')
+    }
+
+    if (!opt.httpOnly) {
+      throw new Error('__Http- Cookie must have HttpOnly attributes')
+    }
+  }
+
   if (/^__host-/i.test(name)) {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis-22#section-4.1.3.2
     if (!opt.secure) {
@@ -195,6 +211,10 @@ const _serialize = (name: string, value: string, opt: CookieOptions = {}): strin
 
     if (opt.domain) {
       throw new Error('__Host- Cookie must not have Domain attributes')
+    }
+
+    if (/^__host-http-/i.test(name) && !opt.httpOnly) {
+      throw new Error('__Host-Http- Cookie must have HttpOnly attributes')
     }
   }
 
@@ -214,7 +234,7 @@ const _serialize = (name: string, value: string, opt: CookieOptions = {}): strin
     cookie += `; Max-Age=${opt.maxAge | 0}`
   }
 
-  if (opt.domain && opt.prefix !== 'host') {
+  if (opt.domain && opt.prefix !== 'host' && opt.prefix !== 'host-http') {
     cookie += `; Domain=${opt.domain}`
   }
 

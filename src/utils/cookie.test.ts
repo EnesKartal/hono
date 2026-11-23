@@ -376,6 +376,24 @@ describe('Set cookie', () => {
     expect(serialize('__host-sid', 'v', { secure: true, path: '/' })).toBe(
       '__host-sid=v; Path=/; Secure'
     )
+    expect(() => serialize('__http-sid', 'v')).toThrowError(
+      '__Http- Cookie must have Secure attributes'
+    )
+    expect(() => serialize('__http-sid', 'v', { secure: true })).toThrowError(
+      '__Http- Cookie must have HttpOnly attributes'
+    )
+    expect(serialize('__http-sid', 'v', { secure: true, httpOnly: true })).toBe(
+      '__http-sid=v; HttpOnly; Secure'
+    )
+    expect(() => serialize('__host-http-sid', 'v')).toThrowError(
+      '__Host- Cookie must have Secure attributes'
+    )
+    expect(() => serialize('__host-http-sid', 'v', { secure: true, path: '/' })).toThrowError(
+      '__Host-Http- Cookie must have HttpOnly attributes'
+    )
+    expect(
+      serialize('__host-http-sid', 'v', { secure: true, httpOnly: true, path: '/' })
+    ).toBe('__host-http-sid=v; Path=/; HttpOnly; Secure')
   })
 
   it('Should type the __Secure- and __Host- prefixes case-insensitively', () => {
