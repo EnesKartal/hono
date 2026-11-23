@@ -551,6 +551,53 @@ describe('Compress Middleware', () => {
       expect(res.headers.get('Content-Encoding')).toBe('gzip')
     })
   })
+
+  describe('Error handling after compress()', () => {
+    it('should not inherit Content-Encoding on onError JSON response', async () => {
+      const app = new Hono()
+      app.onError((_err, c) => c.json({ error: 'failed' }, 500))
+      app.use(async (_c, next) => {
+        await next()
+        throw new Error('failed after route responded')
+      })
+      app.use(compress())
+      app.get('/', (c) => c.text('x'.repeat(4096)))
+
+      const res = await app.request('/', { headers: { 'Accept-Encoding': 'gzip' } })
+      expect(res.status).toBe(500)
+      expect(res.headers.get('Content-Encoding')).toBeNull()
+      expect(await res.json()).toEqual({ error: 'failed' })
+    })
+
+    it('should not inherit Content-Encoding on default error handler response', async () => {
+      const app = new Hono()
+      app.use(async (_c, next) => {
+        await next()
+        throw new Error('failed after route responded')
+      })
+      app.use(compress())
+      app.get('/', (c) => c.text('x'.repeat(4096)))
+
+      const res = await app.request('/', { headers: { 'Accept-Encoding': 'gzip' } })
+      expect(res.status).toBe(500)
+      expect(res.headers.get('Content-Encoding')).toBeNull()
+    })
+
+    it('should preserve Content-Encoding explicitly set by onError', async () => {
+      const app = new Hono()
+      app.onError((_err, c) => c.text('encoded', 500, { 'Content-Encoding': 'deflate' }))
+      app.use(async (_c, next) => {
+        await next()
+        throw new Error('failed after route responded')
+      })
+      app.use(compress())
+      app.get('/', (c) => c.text('x'.repeat(4096)))
+
+      const res = await app.request('/', { headers: { 'Accept-Encoding': 'gzip' } })
+      expect(res.status).toBe(500)
+      expect(res.headers.get('Content-Encoding')).toBe('deflate')
+    })
+  })
 })
 
 async function decompressResponse(res: Response): Promise<string> {
